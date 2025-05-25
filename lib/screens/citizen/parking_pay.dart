@@ -7,8 +7,9 @@ class ParkingPayPage extends StatelessWidget {
 
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("ParkingPayPage")),
+      appBar: AppBar(title: const Text("ParkingPayScreen")),
       body: const Center(child: Text("ParkingPayPage")),
+    
     );
   }
 }
