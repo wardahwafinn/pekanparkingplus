@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "529198364329",
+    "project_id": "pekanparkingplus",
+    "storage_bucket": "pekanparkingplus.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:529198364329:android:5a93746bdb23f904e75bb8",
+        "android_client_info": {
+          "package_name": "com.example.ppp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeYc4Z1mnlMZ6cxc94-T_ZYKmT2OPDbuY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:529198364329:android:557506fa1aa1e36ce75bb8",
+        "android_client_info": {
+          "package_name": "com.serenova.pekanparkingplus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeYc4Z1mnlMZ6cxc94-T_ZYKmT2OPDbuY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
