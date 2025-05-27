@@ -107,7 +107,6 @@ class _ParkingPayScreenState extends State<ParkingPayScreen> {
                 ],
               ),
             ),
-            _buildBottomNavigationBar(),
           ],
         ),
       ),
@@ -221,29 +220,6 @@ class _ParkingPayScreenState extends State<ParkingPayScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      height: 80,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.white, Color(0xFF87CEEB)],
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(Icons.home_outlined, 'Home', false),
-          _buildNavItem(Icons.history, 'History', false),
-          _buildParkingButton(),
-          _buildNavItem(Icons.notifications_outlined, 'Notification', false),
-          _buildNavItem(Icons.person_outline, 'Profile', false),
-        ],
       ),
     );
   }
@@ -387,7 +363,6 @@ class ParkingTransactionScreen extends StatelessWidget {
                 ),
               ),
             ),
-            _buildBottomNavigationBar(),
           ],
         ),
       ),
@@ -437,28 +412,6 @@ class ParkingTransactionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      height: 80,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Colors.white, Color(0xFF87CEEB)],
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(Icons.home_outlined, 'Home', false),
-          _buildNavItem(Icons.history, 'History', false),
-          _buildParkingButton(),
-          _buildNavItem(Icons.notifications_outlined, 'Notification', false),
-          _buildNavItem(Icons.person_outline, 'Profile', false),
-        ],
-      ),
-    );
-  }
 
   Widget _buildNavItem(IconData icon, String label, bool isActive) {
     return Column(

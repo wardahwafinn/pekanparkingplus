@@ -49,66 +49,68 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             const SizedBox(height: 20),
-            
+
             // Vehicle List
-            ...vehicles.map((vehicle) => Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
+            ...vehicles.map(
+              (vehicle) => Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                    child: const Icon(
-                      Icons.directions_car_outlined,
-                      size: 24,
-                      color: Colors.black54,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.directions_car_outlined,
+                        size: 24,
+                        color: Colors.black54,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          vehicle['plate']!,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            vehicle['plate']!,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          vehicle['owner']!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                          const SizedBox(height: 4),
+                          Text(
+                            vehicle['owner']!,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            )),
-            
+            ),
+
             const SizedBox(height: 20),
-            
+
             // Add New Vehicle Button
             GestureDetector(
               onTap: () {
@@ -135,11 +137,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.add,
-                      color: Colors.black54,
-                      size: 20,
-                    ),
+                    Icon(Icons.add, color: Colors.black54, size: 20),
                     SizedBox(width: 8),
                     Text(
                       'Add New Vehicle',
@@ -153,7 +151,7 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 100),
           ],
         ),
@@ -198,7 +196,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                if (plateController.text.isNotEmpty && ownerController.text.isNotEmpty) {
+                if (plateController.text.isNotEmpty &&
+                    ownerController.text.isNotEmpty) {
                   setState(() {
                     vehicles.add({
                       'plate': plateController.text.toUpperCase(),
