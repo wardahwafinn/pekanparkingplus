@@ -17,7 +17,7 @@ class CitizenNav extends StatefulWidget {
 
 class _CitizenNavState extends State<CitizenNav> {
   int _currentIndex = 0;
-  
+
   // Method to navigate to SamanPay from homepage
   void navigateToSamanPay() {
     setState(() {
@@ -44,9 +44,9 @@ class _CitizenNavState extends State<CitizenNav> {
       onNavigateToReport: navigateToReport,
     ), // Index 0 - Home
     const ParkingHistoryScreen(), // Index 1 - History
-    const ParkingPayPage(), // Index 2 - Parking Pay
+    const ParkingPayApp(), // Index 2 - Parking Pay
     const NotificationPage(), // Index 3 - Notification
-    const ProfilePage(), // Index 4 - Profile
+    const ProfileScreen(), // Index 4 - Profile
     const SamanPayScreen(), // Index 5 - SamanPay
     const VehicleListScreen(), // Index 6 - Vehicle
     const ReportScreen(), // Index 7 - Report
@@ -55,7 +55,7 @@ class _CitizenNavState extends State<CitizenNav> {
   @override
   Widget build(BuildContext context) {
     print("Current index: $_currentIndex");
-    
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -87,11 +87,12 @@ class _CitizenNavState extends State<CitizenNav> {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     // Show home as selected when on SamanPay (5), Vehicle (6), or Report (7)
-    bool isSelected = _currentIndex == index || 
-                     (_currentIndex == 5 && index == 0) || // SamanPay
-                     (_currentIndex == 6 && index == 0) || // Vehicle
-                     (_currentIndex == 7 && index == 0);   // Report
-    
+    bool isSelected =
+        _currentIndex == index ||
+        (_currentIndex == 5 && index == 0) || // SamanPay
+        (_currentIndex == 6 && index == 0) || // Vehicle
+        (_currentIndex == 7 && index == 0); // Report
+
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       child: Container(
@@ -99,11 +100,7 @@ class _CitizenNavState extends State<CitizenNav> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.blue : Colors.grey,
-              size: 24,
-            ),
+            Icon(icon, color: isSelected ? Colors.blue : Colors.grey, size: 24),
             const SizedBox(height: 4),
             Text(
               label,
@@ -138,7 +135,11 @@ class _CitizenNavState extends State<CitizenNav> {
                   shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: Icon(Icons.local_parking, color: Colors.white, size: 30),
+                  child: Icon(
+                    Icons.local_parking,
+                    color: Colors.white,
+                    size: 30,
+                  ),
                 ),
               ),
             ],

@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Smart Parking App',
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-       home: CitizenNav(),
+      home: AuthWrapper(),
     );
   }
 }
@@ -26,7 +26,8 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const CircularProgressIndicator();
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return const CircularProgressIndicator();
         if (snapshot.hasData) {
           return FutureBuilder<String?>(
             future: AuthService().getUserRole(snapshot.data!.uid),
