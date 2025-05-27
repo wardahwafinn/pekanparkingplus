@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback? onLogout;
+  
+  const ProfileScreen({super.key, this.onLogout});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -10,11 +14,66 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool emailNotificationEnabled = true;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  String userName = 'Loading...';
+  String userEmail = 'Loading...';
+  String userPhone = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+            
+        if (userDoc.exists) {
+          setState(() {
+            userName = userDoc.data()?['name'] ?? 'User';
+            userEmail = user.email ?? 'No email';
+            userPhone = userDoc.data()?['phone'] ?? 'No phone';
+            emailNotificationEnabled = userDoc.data()?['emailNotifications'] ?? true;
+          });
+        } else {
+          setState(() {
+            userName = 'User';
+            userEmail = user.email ?? 'No email';
+            userPhone = 'No phone';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
+  }
+
+  Future<void> _updateNotificationSetting(bool value) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .update({'emailNotifications': value});
+      }
+    } catch (e) {
+      print('Error updating notification setting: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF87CEEB), // Sky blue background
+      backgroundColor: const Color(0xFF87CEEB),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -22,13 +81,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'Profile',
           style: TextStyle(
             color: Colors.black,
-            fontSize: 40,
+            fontSize: 30,
             fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
-        leading: Container(), // Remove back button
+        leading: Container(),
         systemOverlayStyle: SystemUiOverlayStyle.dark,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.logout,
+              color: Colors.black87,
+            ),
+            onPressed: widget.onLogout,
+            tooltip: 'Logout',
+          ),
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -36,7 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF87CEEB), // Sky blue
+              Color(0xFF87CEEB),
               Colors.white,
             ],
             stops: [0.0, 0.1],
@@ -51,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 20),
                   _buildProfileHeader(),
                   const SizedBox(height: 40),
-                  _buildSectionTitle('Setting'),
+                  _buildSectionTitle('Settings'),
                   const SizedBox(height: 12),
                   _buildSettingItem(
                     icon: Icons.person_outline,
@@ -87,7 +156,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: 'Chat with Us',
                     onTap: () => _navigateToChat(context),
                   ),
-                  const SizedBox(height: 100), // Space for bottom nav
+                  const SizedBox(height: 30),
+                  _buildSectionTitle('Account'),
+                  const SizedBox(height: 12),
+                  _buildSettingItem(
+                    icon: Icons.logout,
+                    title: 'Logout',
+                    onTap: widget.onLogout,
+                    isDestructive: true,
+                  ),
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -117,9 +195,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Icon(Icons.person_outline, size: 60, color: Colors.grey[600]),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Nur Liya Maisarah binti Ahmad Haznan',
-          style: TextStyle(
+        Text(
+          userName,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Colors.black87,
@@ -128,9 +206,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          '012-3456788',
-          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          userEmail,
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
         ),
+        if (userPhone != 'No phone') ...[
+          const SizedBox(height: 4),
+          Text(
+            userPhone,
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+        ],
       ],
     );
   }
@@ -152,7 +237,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildSettingItem({
     required IconData icon,
     required String title,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
+    bool isDestructive = false,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
@@ -164,15 +250,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(
               children: [
-                Icon(icon, size: 24, color: Colors.grey[700]),
+                Icon(
+                  icon,
+                  size: 24,
+                  color: isDestructive ? Colors.red[600] : Colors.grey[700],
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(fontSize: 16, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isDestructive ? Colors.red[600] : Colors.black87,
+                    ),
                   ),
                 ),
-                Icon(Icons.chevron_right, color: Colors.grey[400], size: 24),
+                if (!isDestructive)
+                  Icon(Icons.chevron_right, color: Colors.grey[400], size: 24),
               ],
             ),
           ),
@@ -201,6 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               setState(() {
                 emailNotificationEnabled = value;
               });
+              _updateNotificationSetting(value);
               _showSnackBar(
                 context,
                 'Email notifications ${value ? 'enabled' : 'disabled'}',
@@ -213,45 +308,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
- Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          icon,
-          color: isActive ? const Color(0xFF4A90E2) : Colors.grey[600],
-          size: 24,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isActive ? const Color(0xFF4A90E2) : Colors.grey[600],
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildParkingButton() {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: const BoxDecoration(
-        color: Color(0xFF4A90E2),
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(Icons.local_parking, color: Colors.white, size: 30),
-    );
-  }
 
   // Navigation functions
   void _navigateToEditProfile(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(
+          initialName: userName,
+          initialPhone: userPhone,
+          initialEmail: userEmail,
+          onSave: (name, phone) {
+            setState(() {
+              userName = name;
+              userPhone = phone;
+            });
+          },
+        ),
+      ),
     );
   }
 
@@ -331,24 +405,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// Edit Profile Screen
+// Enhanced Edit Profile Screen with Firebase integration
 class EditProfileScreen extends StatefulWidget {
-  const EditProfileScreen({super.key});
+  final String initialName;
+  final String initialPhone;
+  final String initialEmail;
+  final Function(String, String) onSave;
+
+  const EditProfileScreen({
+    super.key,
+    required this.initialName,
+    required this.initialPhone,
+    required this.initialEmail,
+    required this.onSave,
+  });
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final TextEditingController _nameController = TextEditingController(
-    text: 'Nur Liya Maisarah binti Ahmad Haznan',
-  );
-  final TextEditingController _phoneController = TextEditingController(
-    text: '012-3456788',
-  );
-  final TextEditingController _emailController = TextEditingController(
-    text: 'liya.maisarah@email.com',
-  );
+  late TextEditingController _nameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _emailController;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _phoneController = TextEditingController(text: widget.initialPhone);
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  Future<void> _saveProfile() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'name': _nameController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        widget.onSave(_nameController.text.trim(), _phoneController.text.trim());
+        
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating profile: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -417,7 +536,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Camera functionality'),
+                                content: Text('Camera functionality coming soon'),
                               ),
                             );
                           },
@@ -432,20 +551,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: 16),
               _buildTextField('Phone Number', _phoneController),
               const SizedBox(height: 16),
-              _buildTextField('Email', _emailController),
+              _buildTextField('Email', _emailController, enabled: false),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Profile updated successfully'),
-                      ),
-                    );
-                  },
+                  onPressed: _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4A90E2),
                     shape: RoundedRectangleBorder(
@@ -469,7 +581,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller) {
+  Widget _buildTextField(String label, TextEditingController controller, {bool enabled = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -484,9 +596,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
+          enabled: enabled,
           decoration: InputDecoration(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: enabled ? Colors.white : Colors.grey[100],
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -502,7 +615,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 }
 
-// Payment Method Screen
+// Rest of the profile screens remain the same
 class PaymentMethodScreen extends StatelessWidget {
   const PaymentMethodScreen({super.key});
 
@@ -542,11 +655,7 @@ class PaymentMethodScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _buildPaymentOption('Credit Card', Icons.credit_card, true),
             _buildPaymentOption('Debit Card', Icons.payment, false),
-            _buildPaymentOption(
-              'Digital Wallet',
-              Icons.account_balance_wallet,
-              false,
-            ),
+            _buildPaymentOption('Digital Wallet', Icons.account_balance_wallet, false),
             _buildPaymentOption('Bank Transfer', Icons.account_balance, false),
             const SizedBox(height: 30),
             SizedBox(
@@ -554,11 +663,8 @@ class PaymentMethodScreen extends StatelessWidget {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddPaymentMethodScreen(),
-                    ),
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Add payment method coming soon')),
                   );
                 },
                 style: ElevatedButton.styleFrom(
@@ -608,158 +714,6 @@ class PaymentMethodScreen extends StatelessWidget {
   }
 }
 
-// Add Payment Method Screen
-class AddPaymentMethodScreen extends StatelessWidget {
-  const AddPaymentMethodScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF87CEEB),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Add Payment Method',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF87CEEB), Colors.white],
-            stops: [0.0, 0.1],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              const Text(
-                'Card Number',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  hintText: '1234 5678 9012 3456',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Expiry Date',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintText: 'MM/YY',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'CVV',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintText: '123',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Payment method added successfully'),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Add Payment Method',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// Tutorial Screen
 class TutorialScreen extends StatelessWidget {
   const TutorialScreen({super.key});
 
@@ -858,7 +812,6 @@ class TutorialScreen extends StatelessWidget {
   }
 }
 
-// FAQ Screen
 class FAQScreen extends StatelessWidget {
   const FAQScreen({super.key});
 
@@ -904,8 +857,8 @@ class FAQScreen extends StatelessWidget {
               'Yes, you can extend parking time through the app before expiry.',
             ),
             _buildFAQItem(
-              'hwo do I pay for my saman?',
-              'home > samanPay > choose your saman> Pay',
+              'How do I pay for my saman?',
+              'Go to Home > SamanPay > choose your saman > Pay',
             ),
             _buildFAQItem(
               'What payment methods are accepted?',
@@ -943,7 +896,6 @@ class FAQScreen extends StatelessWidget {
   }
 }
 
-// Chat Screen
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -1105,13 +1057,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _messageController.clear();
       });
 
-      // Simulate bot response
       Future.delayed(const Duration(seconds: 1), () {
         setState(() {
           _messages.add(
             ChatMessage(
-              message:
-                  'Thank you for your message. Our support team will get back to you shortly.',
+              message: 'Thank you for your message. Our support team will get back to you shortly.',
               isUser: false,
               time: TimeOfDay.now().format(context),
             ),
@@ -1122,7 +1072,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// Chat Message Model
 class ChatMessage {
   final String message;
   final bool isUser;
@@ -1133,27 +1082,4 @@ class ChatMessage {
     required this.isUser,
     required this.time,
   });
-}
-
-// Main App
-class ProfileApp extends StatelessWidget {
-  const ProfileApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Parking Profile',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'San Francisco', // iOS-like font
-      ),
-      home: const ProfileScreen(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-// If you want to run this as a complete app
-void main() {
-  runApp(const ProfileApp());
 }

@@ -1,4 +1,6 @@
+// Updated citizen_nav.dart - Fix for black screen issue
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'home.dart';
 import 'history.dart';
 import 'parking_pay.dart';
@@ -7,6 +9,8 @@ import 'profile.dart';
 import 'samanpay.dart';
 import 'report.dart';
 import 'vehicle.dart';
+import 'chatbot.dart';
+import 'reload.dart';
 
 class CitizenNav extends StatefulWidget {
   const CitizenNav({super.key});
@@ -18,44 +22,105 @@ class CitizenNav extends StatefulWidget {
 class _CitizenNavState extends State<CitizenNav> {
   int _currentIndex = 0;
 
-  // Method to navigate to SamanPay from homepage
+  // FIXED: Use navigation instead of changing index for sub-screens
   void navigateToSamanPay() {
-    setState(() {
-      _currentIndex = 5; // SamanPay is at index 5
-    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const SamanPayScreen()),
+    );
   }
 
   void navigateToVehicle() {
-    setState(() {
-      _currentIndex = 6; // Vehicle is at index 6
-    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const VehicleListScreen()),
+    );
   }
 
   void navigateToReport() {
-    setState(() {
-      _currentIndex = 7; // Report is at index 7
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ReportScreen()),
+    );
+  }
+
+  void navigateToChatbot() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ChatbotScreen()),
+    );
+  }
+
+  void navigateToReload() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const BalanceReloadScreen()),
+    ).then((_) {
+      // Refresh the home screen when returning from reload
+      if (_currentIndex == 0) {
+        setState(() {});
+      }
     });
   }
 
+  // Logout function
+  Future<void> _logout() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error logging out: $e')));
+    }
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _logout();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // FIXED: Only include main navigation screens
   List<Widget> get _screens => [
     HomePageCitizen(
       onNavigateToSamanPay: navigateToSamanPay,
       onNavigateToVehicle: navigateToVehicle,
       onNavigateToReport: navigateToReport,
+      onNavigateToChatbot: navigateToChatbot,
+      onNavigateToReload: navigateToReload,
+      onLogout: _showLogoutDialog,
     ), // Index 0 - Home
     const ParkingHistoryScreen(), // Index 1 - History
     const ParkingPayApp(), // Index 2 - Parking Pay
-    const NotificationPage(), // Index 3 - Notification
-    const ProfileScreen(), // Index 4 - Profile
-    const SamanPayScreen(), // Index 5 - SamanPay
-    const VehicleListScreen(), // Index 6 - Vehicle
-    const ReportScreen(), // Index 7 - Report
+    const NotificationScreen(), // Index 3 - Notification
+    ProfileScreen(onLogout: _showLogoutDialog), // Index 4 - Profile
   ];
 
   @override
   Widget build(BuildContext context) {
-    print("Current index: $_currentIndex");
-
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: _buildBottomNavigationBar(),
@@ -86,12 +151,7 @@ class _CitizenNavState extends State<CitizenNav> {
   }
 
   Widget _buildNavItem(IconData icon, String label, int index) {
-    // Show home as selected when on SamanPay (5), Vehicle (6), or Report (7)
-    bool isSelected =
-        _currentIndex == index ||
-        (_currentIndex == 5 && index == 0) || // SamanPay
-        (_currentIndex == 6 && index == 0) || // Vehicle
-        (_currentIndex == 7 && index == 0); // Report
+    bool isSelected = _currentIndex == index;
 
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),

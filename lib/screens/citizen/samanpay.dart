@@ -1,184 +1,284 @@
+// Updated samanpay.dart with working database integration
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/firestore_service.dart';
 
-// Main Fines List Screen
-class SamanPayScreen extends StatelessWidget {
-  const SamanPayScreen({Key? key}) : super(key: key);
+class SamanPayScreen extends StatefulWidget {
+  const SamanPayScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF87CEEB),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'SamanPay',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        leading: Container(),
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF87CEEB), Colors.white],
-            stops: [0.0, 0.3],
-          ),
-        ),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const SizedBox(height: 20),
-            _buildSectionHeader('New Fine'),
-            const SizedBox(height: 12),
-            _buildFineItem(
-              context: context,
-              vehicleNumber: 'VFK4567',
-              title: 'VFK4567 receive a parking fine',
-              date: '9 Mar 25 | 2:00 PM',
-              status: 'NOT PAID',
-              isPaid: false,
-            ),
-            const SizedBox(height: 24),
-            _buildSectionHeader('Past Fine'),
-            const SizedBox(height: 12),
-            _buildFineItem(
-              context: context,
-              vehicleNumber: 'CEM1233',
-              title: 'CEM1233 receive a parking fine',
-              date: '23 Jan 25 | 1:43 PM',
-              status: 'PAID',
-              isPaid: true,
-            ),
-            const SizedBox(height: 12),
-            _buildFineItem(
-              context: context,
-              vehicleNumber: 'VFK4567',
-              title: 'VFK4567 receive a parking fine',
-              date: '10 Oct 24 | 12:13 PM',
-              status: 'PAID',
-              isPaid: true,
-            ),
-            const SizedBox(height: 100),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.black87,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFineItem({
-    required BuildContext context,
-    required String vehicleNumber,
-    required String title,
-    required String date,
-    required String status,
-    required bool isPaid,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ParkingFineTicketScreen(
-              vehicleNumber: vehicleNumber,
-              isPaid: isPaid,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    date,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isPaid ? Colors.green[50] : Colors.red[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isPaid ? Colors.green[200]! : Colors.red[200]!,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                status,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isPaid ? Colors.green[700] : Colors.red[700],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  State<SamanPayScreen> createState() => _SamanPayScreenState();
 }
 
-// Parking Fine Ticket Detail Screen
-class ParkingFineTicketScreen extends StatelessWidget {
-  final String vehicleNumber;
-  final bool isPaid;
+class _SamanPayScreenState extends State<SamanPayScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final DatabaseService _dbService = DatabaseService();
+  
+  double currentBalance = 0.0;
+  List<Map<String, dynamic>> fines = [];
+  bool isLoadingBalance = true;
+  bool isLoadingFines = true;
 
-  const ParkingFineTicketScreen({
-    Key? key,
-    required this.vehicleNumber,
-    required this.isPaid,
-  }) : super(key: key);
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await Future.wait([
+      _loadUserBalance(),
+      _loadUserFines(),
+    ]);
+  }
+
+  Future<void> _loadUserBalance() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final balance = await _dbService.getUserBalance(user.uid);
+        setState(() {
+          currentBalance = balance;
+          isLoadingBalance = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingBalance = false;
+      });
+      print('Error loading balance: $e');
+    }
+  }
+
+  Future<void> _loadUserFines() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final userFines = await _dbService.getUserFines(user.uid);
+        setState(() {
+          fines = userFines;
+          isLoadingFines = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        isLoadingFines = false;
+      });
+      print('Error loading fines: $e');
+    }
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      isLoadingBalance = true;
+      isLoadingFines = true;
+    });
+    await _loadData();
+  }
+
+  void _showFineDetails(Map<String, dynamic> fine) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => FineDetailsSheet(
+        fine: fine,
+        currentBalance: currentBalance,
+        onPayPressed: () => _processFinePayment(fine),
+        onReloadPressed: () => _navigateToReload(),
+      ),
+    );
+  }
+
+  void _processFinePayment(Map<String, dynamic> fine) async {
+    Navigator.of(context).pop(); // Close bottom sheet
+
+    final amount = fine['amount']?.toDouble() ?? 0.0;
+    
+    if (currentBalance < amount) {
+      _showInsufficientBalanceDialog(amount);
+      return;
+    }
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      ),
+    );
+
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _dbService.payFine(user.uid, fine['id'], amount);
+        
+        // Update local state
+        setState(() {
+          currentBalance -= amount;
+          fine['status'] = 'paid';
+        });
+
+        Navigator.of(context).pop(); // Close loading
+        _showPaymentSuccessDialog(fine);
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Close loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showInsufficientBalanceDialog(double amount) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text('Insufficient Balance'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              size: 60,
+              color: Colors.orange,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Your current balance is RM${currentBalance.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You need RM${amount.toStringAsFixed(2)} to pay this fine.',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Please reload your wallet first.',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _navigateToReload();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A90E2),
+            ),
+            child: const Text(
+              'Reload Now',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentSuccessDialog(Map<String, dynamic> fine) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: const BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check, color: Colors.white, size: 50),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Payment Successful!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Fine for ${fine['vehiclePlate']} has been paid',
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Amount: RM${fine['amount'].toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Remaining Balance: RM${currentBalance.toStringAsFixed(2)}',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 30),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A90E2),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToReload() {
+    // Navigate to reload screen - this would be handled by parent navigation
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please use the reload option from the home screen'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -211,686 +311,458 @@ class ParkingFineTicketScreen extends StatelessWidget {
             stops: [0.0, 0.3],
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
           child: Column(
             children: [
-              const SizedBox(height: 40),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+              // Balance Display
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Wallet Balance',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      isLoadingBalance
+                          ? const CircularProgressIndicator()
+                          : Text(
+                              'RM ${currentBalance.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                    ],
+                  ),
                 ),
+              ),
+
+              Expanded(
+                child: isLoadingFines
+                    ? const Center(child: CircularProgressIndicator())
+                    : fines.isEmpty
+                        ? _buildEmptyState()
+                        : _buildFinesList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            size: 64,
+            color: Colors.green[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No Fines Found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You have no outstanding parking fines',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFinesList() {
+    final unpaidFines = fines.where((fine) => fine['status'] == 'unpaid').toList();
+    final paidFines = fines.where((fine) => fine['status'] == 'paid').toList();
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      children: [
+        // New Fine Section
+        if (unpaidFines.isNotEmpty) ...[
+          const Text(
+            'Outstanding Fines',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...unpaidFines.map((fine) => _buildFineItem(fine, isNew: true)),
+          const SizedBox(height: 24),
+        ],
+
+        // Past Fine Section
+        if (paidFines.isNotEmpty) ...[
+          const Text(
+            'Paid Fines',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...paidFines.map((fine) => _buildFineItem(fine, isNew: false)),
+          const SizedBox(height: 100),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFineItem(Map<String, dynamic> fine, {required bool isNew}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: isNew ? () => _showFineDetails(fine) : null,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${fine['vehiclePlate']} received a parking fine',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${fine['formattedDate']} | ${fine['formattedTime']}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'RM${fine['amount'].toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: fine['status'] == 'paid'
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                fine['status'] == 'paid' ? 'PAID' : 'NOT PAID',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: fine['status'] == 'paid' ? Colors.green : Colors.red,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Fine Details Sheet (keeping the existing implementation but updating with real data)
+class FineDetailsSheet extends StatelessWidget {
+  final Map<String, dynamic> fine;
+  final double currentBalance;
+  final VoidCallback onPayPressed;
+  final VoidCallback onReloadPressed;
+
+  const FineDetailsSheet({
+    super.key,
+    required this.fine,
+    required this.currentBalance,
+    required this.onPayPressed,
+    required this.onReloadPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = fine['amount']?.toDouble() ?? 0.0;
+    bool canPay = currentBalance >= amount;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Color(0xFF87CEEB),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'Fine Details',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF87CEEB), Colors.white],
+                  stops: [0.0, 0.3],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Center(
-                      child: Text(
-                        'Parking Fine Ticket',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                    // Fine Details Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey[300]!,
+                          style: BorderStyle.solid,
+                          width: 1,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Container(
-                        height: 1,
-                        width: 200,
-                        color: Colors.grey[300],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Parking Fine Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _buildDetailRow('Reference:', fine['refNo'] ?? fine['id']),
+                          _buildDetailRow('Date:', fine['formattedDate'] ?? 'N/A'),
+                          _buildDetailRow('Time:', fine['formattedTime'] ?? 'N/A'),
+                          const SizedBox(height: 16),
+                          Container(height: 1, color: Colors.grey[300]),
+                          const SizedBox(height: 16),
+                          _buildDetailRow('Vehicle:', fine['vehiclePlate'] ?? 'N/A'),
+                          _buildDetailRow('Location:', fine['location'] ?? 'N/A'),
+                          _buildDetailRow('Description:', fine['description'] ?? 'Parking violation'),
+                          _buildDetailRow(
+                            'Amount:',
+                            'RM${amount.toStringAsFixed(2)}',
+                          ),
+                        ],
                       ),
                     ),
+
                     const SizedBox(height: 24),
-                    Text(
-                      'Ref ID: PG1234567',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
+
+                    // Balance Info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: canPay
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: canPay ? Colors.green : Colors.red,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Current Balance: RM${currentBalance.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            canPay
+                                ? 'Sufficient balance to pay this fine'
+                                : 'Insufficient balance. Please reload first.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: canPay ? Colors.green : Colors.red,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      'Ref Date: 9 Mar 25',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Fine Details',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDetailRow('Reference Number:', 'PG1234567'),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(
-                      'Description:',
-                      'Fine for not purchasing parking ticket',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildDetailRow('Vehicle:', vehicleNumber),
-                    const SizedBox(height: 12),
-                    _buildDetailRow('Reference 1:', 'LP12345'),
-                    const SizedBox(height: 12),
-                    _buildDetailRow('Amount:', 'RM10.00'),
-                    const SizedBox(height: 32),
-                    if (!isPaid)
+
+                    const Spacer(),
+
+                    // Action Buttons
+                    if (canPay)
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => FPXPaymentScreen(
-                                  amount: 'RM10.00',
-                                  referenceNumber: 'PG1234567',
-                                  vehicleNumber: vehicleNumber,
-                                ),
-                              ),
-                            );
-                          },
+                          onPressed: onPayPressed,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF4A90E2),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(25),
                             ),
                           ),
                           child: const Text(
-                            'Pay',
+                            'Pay Fine',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 18,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
                           ),
                         ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: onReloadPressed,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                              ),
+                              child: const Text(
+                                'Reload Wallet',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.grey),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildDetailRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 140,
-          child: Text(
-            label,
-            style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-// Example usage in main.dart
-class SamanPayApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SamanPay',
-      theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'San Francisco'),
-      home: const SamanPayScreen(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-void main() {
-  runApp(SamanPayApp());
-}
-
-// FPX Payment Screen
-class FPXPaymentScreen extends StatefulWidget {
-  final String amount;
-  final String referenceNumber;
-  final String vehicleNumber;
-
-  const FPXPaymentScreen({
-    Key? key,
-    required this.amount,
-    required this.referenceNumber,
-    required this.vehicleNumber,
-  }) : super(key: key);
-
-  @override
-  State<FPXPaymentScreen> createState() => _FPXPaymentScreenState();
-}
-
-class _FPXPaymentScreenState extends State<FPXPaymentScreen> {
-  String? selectedBank;
-
-  final List<Map<String, String>> banks = [
-    {'name': 'Maybank', 'code': 'MBB', 'logo': '🏦'},
-    {'name': 'CIMB Bank', 'code': 'CIMB', 'logo': '🏦'},
-    {'name': 'Public Bank', 'code': 'PBB', 'logo': '🏦'},
-    {'name': 'RHB Bank', 'code': 'RHB', 'logo': '🏦'},
-    {'name': 'Hong Leong Bank', 'code': 'HLB', 'logo': '🏦'},
-    {'name': 'Bank Islam', 'code': 'BIMB', 'logo': '🏦'},
-    {'name': 'AmBank', 'code': 'AMB', 'logo': '🏦'},
-    {'name': 'Bank Rakyat', 'code': 'BR', 'logo': '🏦'},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF87CEEB),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'FPX Payment',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF87CEEB), Colors.white],
-            stops: [0.0, 0.3],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 20),
-              // Payment Summary Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Payment Summary',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildSummaryRow(
-                      'Reference:',
-                      widget.referenceNumber,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow('Vehicle:', widget.vehicleNumber),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow(
-                      'Fine Amount:',
-                      widget.amount,
-                      isAmount: true,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Bank Selection
-              const Text(
-                'Select Your Bank',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: banks.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final bank = banks[index];
-                      return _buildBankItem(bank);
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Continue Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: selectedBank != null
-                      ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => FPXProcessingScreen(
-                                bankName: selectedBank!,
-                                amount: widget.amount,
-                                referenceNumber: widget.referenceNumber,
-                              ),
-                            ),
-                          );
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: selectedBank != null
-                        ? const Color(0xFF4A90E2)
-                        : Colors.grey[400],
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    'Continue to ${selectedBank ?? 'Bank'}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value, {bool isAmount = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isAmount ? FontWeight.w600 : FontWeight.w500,
-            color: isAmount ? Colors.red[600] : Colors.black87,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBankItem(Map<String, String> bank) {
-    final isSelected = selectedBank == bank['name'];
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedBank = bank['name'];
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  bank['logo']!,
-                  style: const TextStyle(fontSize: 20),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bank['name']!,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    bank['code']!,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? const Color(0xFF4A90E2) : Colors.grey[400]!,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? Container(
-                      margin: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF4A90E2),
-                      ),
-                    )
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// FPX Processing Screen
-class FPXProcessingScreen extends StatefulWidget {
-  final String bankName;
-  final String amount;
-  final String referenceNumber;
-
-  const FPXProcessingScreen({
-    Key? key,
-    required this.bankName,
-    required this.amount,
-    required this.referenceNumber,
-  }) : super(key: key);
-
-  @override
-  State<FPXProcessingScreen> createState() => _FPXProcessingScreenState();
-}
-
-class _FPXProcessingScreenState extends State<FPXProcessingScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  bool isProcessing = true;
-  bool isSuccess = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat();
-
-    // Simulate payment processing
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          isProcessing = false;
-          isSuccess = true;
-        });
-        _animationController.stop();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF87CEEB),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Payment Processing',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        leading: Container(), // Disable back button during processing
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF87CEEB), Colors.white],
-            stops: [0.0, 0.3],
-          ),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isProcessing) ...[
-                    RotationTransition(
-                      turns: _animationController,
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFF4A90E2),
-                            width: 4,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.sync,
-                          color: Color(0xFF4A90E2),
-                          size: 40,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Processing Payment',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Please wait while we process your payment with ${widget.bankName}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                  ] else if (isSuccess) ...[
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.green,
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Payment Successful!',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Your parking fine has been paid successfully.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildReceiptRow(
-                            'Reference:',
-                            widget.referenceNumber,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildReceiptRow('Amount:', widget.amount),
-                          const SizedBox(height: 8),
-                          _buildReceiptRow('Bank:', widget.bankName),
-                          const SizedBox(height: 8),
-                          _buildReceiptRow(
-                            'Date:',
-                            DateTime.now().toString().substring(0, 16),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.popUntil(context, (route) => route.isFirst);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4A90E2),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Done',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              textAlign: TextAlign.right,
             ),
           ),
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildReceiptRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
-        ),
-      ],
     );
   }
 }
